@@ -65,6 +65,7 @@ class WebSocketService {
     private setupConnectionHandlers(): void {
         if (!this.pusher) return;
 
+
         // Conexión establecida
         this.pusher.connection.bind('connected', () => {
             this.isConnected = true;
@@ -120,6 +121,7 @@ class WebSocketService {
             console.error('❌ Error al suscribirse al canal:', error);
         });
 
+        // PrinterCommandEvent
         // Escuchar evento de impresión (Laravel Reverb usa el nombre del evento del broadcast)
         this.channel.bind('print-command', async (data: any) => {
             console.log('');
@@ -163,8 +165,16 @@ class WebSocketService {
             console.log('═══════════════════════════════════════════════════════');
             console.log(`   Job ID: ${command.job_id}`);
             console.log(`   Tipo: ${command.tipo_impresion}`);
-            console.log(`   Ticket: ${command.metadata.numero_ticket || 'N/A'}`);
-            console.log(`   Placa: ${command.metadata.placa || 'N/A'}`);
+
+            // Mostrar información relevante según el tipo
+            if (command.tipo_impresion === 'comprobante') {
+                console.log(`   Serie: ${command.metadata.serie_numero || 'N/A'}`);
+                console.log(`   Tipo Comprobante: ${command.metadata.tipo || 'N/A'}`);
+            } else {
+                console.log(`   Ticket: ${command.metadata.numero_ticket || 'N/A'}`);
+                console.log(`   Placa: ${command.metadata.placa || 'N/A'}`);
+            }
+
             console.log('═══════════════════════════════════════════════════════');
             console.log('');
 

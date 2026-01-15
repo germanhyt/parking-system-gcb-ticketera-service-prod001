@@ -110,7 +110,7 @@ class WebSocketService {
             console.error('❌ Error al suscribirse al canal:', error);
         });
         // Escuchar evento de impresión (Laravel Reverb usa el nombre del evento del broadcast)
-        this.channel.bind('print-command', async (data) => {
+        this.channel.bind('PrinterCommandEvent', async (data) => {
             console.log('');
             console.log('═══════════════════════════════════════════════════════');
             console.log('📄 COMANDO DE IMPRESIÓN RECIBIDO');

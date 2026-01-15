@@ -15,6 +15,9 @@ export interface PrintCommand {
         sede_nombre?: string;
         sede_id?: number;
         timestamp?: string;
+
+        tipo?: string;
+        serie_numero?: string;
     };
     timestamp: string;
 }
