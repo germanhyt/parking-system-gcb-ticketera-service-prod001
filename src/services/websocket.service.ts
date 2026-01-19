@@ -25,11 +25,22 @@ class WebSocketService {
         }
 
         console.log('');
-        console.log(`📍 Sede: ${config.caja.sedeNombre} (Caja ${config.caja.codigo})`);
-        console.log(`🆔 Caja ID: ${config.caja.id}`);
-        console.log(`🖨️  Impresora: ${config.printer.name}`);
-        console.log(`🔌 Servidor: ${config.websocket.serverUrl}`);
-        console.log(`📡 Canal: printer.caja.${config.caja.id}`);
+
+        // Mostrar información según modo
+        if (config.modo === 'puerta') {
+            console.log(`📍 Sede: ${config.puerta.sedeNombre}`);
+            console.log(`🚪 Puerta: ${config.puerta.numero} (ID: ${config.puerta.id})`);
+            console.log(`🖨️  Impresora: ${config.printer.name}`);
+            console.log(`🔌 Servidor: ${config.websocket.serverUrl}`);
+            console.log(`📡 Canal: printer.puerta.${config.puerta.id}`);
+        } else {
+            console.log(`📍 Sede: ${config.caja.sedeNombre} (Caja ${config.caja.codigo})`);
+            console.log(`🆔 Caja ID: ${config.caja.id}`);
+            console.log(`🖨️  Impresora: ${config.printer.name}`);
+            console.log(`🔌 Servidor: ${config.websocket.serverUrl}`);
+            console.log(`📡 Canal: printer.caja.${config.caja.id}`);
+        }
+
         console.log('═══════════════════════════════════════════════════════');
         console.log('');
 
@@ -51,8 +62,10 @@ class WebSocketService {
         // Configurar event handlers de conexión
         this.setupConnectionHandlers();
 
-        // Suscribirse al canal específico de la caja
-        const channelName = `printer.caja.${config.caja.id}`;
+        // Suscribirse al canal según modo
+        const channelName = config.modo === 'puerta'
+            ? `printer.puerta.${config.puerta.id}`
+            : `printer.caja.${config.caja.id}`;
         this.channel = this.pusher.subscribe(channelName);
 
         // Configurar listeners de eventos del canal
@@ -69,9 +82,13 @@ class WebSocketService {
         // Conexión establecida
         this.pusher.connection.bind('connected', () => {
             this.isConnected = true;
+            const channelName = config.modo === 'puerta'
+                ? `printer.puerta.${config.puerta.id}`
+                : `printer.caja.${config.caja.id}`;
+
             console.log('✅ Conectado al servidor WebSocket (Reverb)');
             console.log(`   Socket ID: ${this.pusher?.connection.socket_id}`);
-            console.log(`   Escuchando canal: printer.caja.${config.caja.id}`);
+            console.log(`   Escuchando canal: ${channelName}`);
             console.log('');
         });
 
@@ -136,6 +153,8 @@ class WebSocketService {
             const command: PrintCommand = {
                 job_id: data.job_id,
                 caja_id: data.caja_id,
+                target_id: data.target_id,
+                target_type: data.target_type,
                 texto: data.texto,
                 tipo_impresion: data.tipo_impresion,
                 metadata: data.metadata || {},
@@ -153,15 +172,19 @@ class WebSocketService {
         const startTime = Date.now();
 
         try {
-            // Verificar que el comando es para esta caja
-            if (command.caja_id !== config.caja.id) {
-                console.log(`⚠️  Comando ignorado: es para caja ${command.caja_id}, esta es caja ${config.caja.id}`);
+            // Verificar que el comando es para este dispositivo
+            const targetId = config.modo === 'puerta' ? config.puerta.id : config.caja.id;
+            const commandTargetId = command.target_id || command.caja_id;
+
+            if (commandTargetId !== targetId) {
+                const targetType = config.modo === 'puerta' ? 'puerta' : 'caja';
+                console.log(`⚠️  Comando ignorado: es para ${targetType} ${commandTargetId}, este es ${targetType} ${targetId}`);
                 return;
             }
 
             console.log('');
             console.log('═══════════════════════════════════════════════════════');
-            console.log('🖨️  PROCESANDO IMPRESIÓN');
+            console.log(`🖨️  PROCESANDO IMPRESIÓN - MODO: ${config.modo.toUpperCase()}`);
             console.log('═══════════════════════════════════════════════════════');
             console.log(`   Job ID: ${command.job_id}`);
             console.log(`   Tipo: ${command.tipo_impresion}`);
@@ -173,6 +196,13 @@ class WebSocketService {
             } else {
                 console.log(`   Ticket: ${command.metadata.numero_ticket || 'N/A'}`);
                 console.log(`   Placa: ${command.metadata.placa || 'N/A'}`);
+            }
+
+            // Mostrar puerta o caja
+            if (config.modo === 'puerta') {
+                console.log(`   Puerta: ${config.puerta.numero}`);
+            } else {
+                console.log(`   Caja: ${config.caja.codigo}`);
             }
 
             console.log('═══════════════════════════════════════════════════════');

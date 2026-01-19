@@ -5,6 +5,42 @@ import { websocketService } from './services/websocket.service';
 import { printerService } from './services/printer.service';
 import { AgentStatus } from './types';
 
+// ==================== VALIDACIÓN DE CONFIGURACIÓN ====================
+
+/**
+ * Validar configuración según el modo de operación
+ */
+function validateConfig(): void {
+    console.log('');
+    console.log('🔍 Validando configuración...');
+
+    if (config.modo === 'puerta') {
+        if (!config.puerta.id || !config.puerta.numero) {
+            console.error('❌ ERROR: Configuración de PUERTA incompleta');
+            console.error('   Se requiere: PUERTA_ID y PUERTA_NUMERO en .env');
+            process.exit(1);
+        }
+        console.log(`✅ Modo: PUERTA`);
+        console.log(`   - ID: ${config.puerta.id}`);
+        console.log(`   - Número: ${config.puerta.numero}`);
+        console.log(`   - Sede: ${config.puerta.sedeNombre}`);
+    } else {
+        if (!config.caja.id) {
+            console.error('❌ ERROR: Configuración de CAJA incompleta');
+            console.error('   Se requiere: CAJA_ID en .env');
+            process.exit(1);
+        }
+        console.log(`✅ Modo: CAJA`);
+        console.log(`   - ID: ${config.caja.id}`);
+        console.log(`   - Código: ${config.caja.codigo}`);
+        console.log(`   - Sede: ${config.caja.sedeNombre}`);
+    }
+    console.log('');
+}
+
+// Validar antes de iniciar
+validateConfig();
+
 // ==================== CONFIGURACIÓN EXPRESS ====================
 
 const app = express();
@@ -19,11 +55,10 @@ app.use(express.json());
 app.get('/status', (_req: Request, res: Response<AgentStatus>) => {
     const printerInfo = printerService.getPrinterInfo();
 
-    res.json({
+    const status: AgentStatus = {
         status: websocketService.getConnectionStatus() && printerInfo.available ? 'online' : 'offline',
-        caja_id: config.caja.id,
-        caja_codigo: config.caja.codigo,
-        sede_nombre: config.caja.sedeNombre,
+        modo: config.modo,
+        sede_nombre: config.modo === 'puerta' ? config.puerta.sedeNombre : config.caja.sedeNombre,
         websocket: {
             connected: websocketService.getConnectionStatus(),
             server: config.websocket.serverUrl
@@ -33,7 +68,18 @@ app.get('/status', (_req: Request, res: Response<AgentStatus>) => {
             available: printerInfo.available
         },
         uptime: process.uptime()
-    });
+    };
+
+    // Agregar campos específicos según modo
+    if (config.modo === 'caja') {
+        status.caja_id = config.caja.id;
+        status.caja_codigo = config.caja.codigo;
+    } else {
+        status.puerta_id = config.puerta.id;
+        status.puerta_numero = config.puerta.numero;
+    }
+
+    res.json(status);
 });
 
 /**
