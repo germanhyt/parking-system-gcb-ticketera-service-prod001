@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from './config/config';
 import { websocketService } from './services/websocket.service';
 import { printerService } from './services/printer.service';
+import { buildSamplePrintEvent } from './lib/sample-print-payload';
 import { AgentStatus } from './types';
 
 // ==================== VALIDACIÓN DE CONFIGURACIÓN ====================
@@ -52,8 +53,8 @@ app.use(express.json());
 /**
  * Endpoint de estado del agente
  */
-app.get('/status', (_req: Request, res: Response<AgentStatus>) => {
-    const printerInfo = printerService.getPrinterInfo();
+app.get('/status', async (_req: Request, res: Response<AgentStatus>) => {
+    const printerInfo = await printerService.getPrinterInfoAsync();
 
     const status: AgentStatus = {
         status: websocketService.getConnectionStatus() && printerInfo.available ? 'online' : 'offline',
@@ -85,12 +86,101 @@ app.get('/status', (_req: Request, res: Response<AgentStatus>) => {
 /**
  * Endpoint de health check
  */
-app.get('/health', (_req: Request, res: Response) => {
-    const healthy = websocketService.getConnectionStatus() && printerService.isPrinterAvailable();
+app.get('/health', async (_req: Request, res: Response) => {
+    const printerOk = await printerService.isPrinterAvailableAsync();
+    const healthy = websocketService.getConnectionStatus() && printerOk;
 
     res.status(healthy ? 200 : 503).json({
         healthy,
         timestamp: new Date().toISOString()
+    });
+});
+
+/**
+ * Payload de ejemplo del evento print-command (según .env actual).
+ */
+app.get('/debug/print-event-sample', (_req: Request, res: Response) => {
+    const canal = config.modo === 'puerta'
+        ? `printer.puerta.${config.puerta.id}`
+        : `printer.caja.${config.caja.id}`;
+
+    res.json({
+        evento: 'print-command',
+        canal,
+        descripcion: 'Estructura que envía Laravel Reverb; usar en POST /debug/simulate-print-event',
+        payload: buildSamplePrintEvent(),
+        curl_ejemplo: `curl -X POST http://localhost:${config.server.port}/debug/simulate-print-event -H "Content-Type: application/json" -d "{\\"imprimir\\":false}"`,
+    });
+});
+
+/**
+ * Simula el evento print-command (mismos logs que WebSocket).
+ * Body: payload del evento, o vacío para usar el ejemplo.
+ * Query/body: imprimir=false → solo logs, sin imprimir.
+ */
+app.post('/debug/simulate-print-event', async (req: Request, res: Response) => {
+    const imprimir = req.body?.imprimir !== false && req.query.imprimir !== 'false';
+    const hasEventPayload = req.body?.job_id != null;
+    const payload = hasEventPayload
+        ? req.body
+        : buildSamplePrintEvent();
+
+    const result = await websocketService.onPrintCommandReceived(payload, {
+        source: 'debug-http',
+        imprimir,
+    });
+
+    res.json({
+        ok: true,
+        imprimir,
+        result,
+        payload_usado: payload,
+    });
+});
+
+/**
+ * Impresión física de prueba (solo diagnóstico local)
+ */
+app.post('/test-print', async (req: Request, res: Response) => {
+    const folio = (req.body?.folio as string) || 'PRUEBA-LOCAL';
+    const placa = (req.body?.placa as string) || 'TST-999';
+    const sede = config.modo === 'puerta' ? config.puerta.sedeNombre : config.caja.sedeNombre;
+    const punto = config.modo === 'puerta'
+        ? `Puerta ${config.puerta.numero}`
+        : `Caja ${config.caja.codigo}`;
+
+    const ESC = '\x1B';
+    const GS = '\x1D';
+    let ticket = ESC + '@';
+    ticket += ESC + 'a' + '\x01' + ESC + 'E' + '\x01' + 'PRUEBA TICKETERA' + ESC + 'E' + '\x00' + '\n';
+    ticket += sede + '\n' + punto + '\n';
+    ticket += '--------------------------------\n';
+    ticket += ESC + 'a' + '\x00';
+    ticket += 'Folio: ' + folio + '\n';
+    ticket += 'Placa: ' + placa + '\n';
+    ticket += 'Fecha: ' + new Date().toLocaleString('es-PE') + '\n';
+    ticket += '--------------------------------\n';
+    ticket += ESC + 'a' + '\x01' + 'Impresion de diagnostico\n\n\n';
+    ticket += GS + 'V' + '\x41' + '\x00';
+
+    const result = await printerService.print(ticket);
+
+    if (result.success) {
+        res.json({
+            success: true,
+            message: 'Ticket enviado al spooler. Verifique salida fisica en la impresora.',
+            printer_job_id: result.printerJobId,
+            impresora: config.printer.name,
+            folio,
+            placa
+        });
+        return;
+    }
+
+    res.status(500).json({
+        success: false,
+        error: result.error,
+        impresora: config.printer.name
     });
 });
 
@@ -100,10 +190,18 @@ app.listen(config.server.port, (): void => {
     console.log(`🌐 Servidor HTTP local: http://localhost:${config.server.port}`);
     console.log(`   - Estado: http://localhost:${config.server.port}/status`);
     console.log(`   - Health: http://localhost:${config.server.port}/health`);
+    console.log(`   - Sample evento: http://localhost:${config.server.port}/debug/print-event-sample`);
+    console.log(`   - Simular evento: POST http://localhost:${config.server.port}/debug/simulate-print-event`);
     console.log('');
 
-    // Conectar a WebSocket
-    websocketService.connect();
+    // Conectar a WebSocket (no tumbar HTTP si falla)
+    try {
+        websocketService.connect();
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('❌ WebSocket no inició:', msg);
+        console.error('   El servidor HTTP sigue activo para /test-print y /status');
+    }
 });
 
 // ==================== MANEJO DE CIERRE GRACEFUL ====================

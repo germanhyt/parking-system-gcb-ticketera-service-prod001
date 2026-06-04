@@ -5,9 +5,18 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "dev": "npx ts-node src/index.ts",
+    "reinstalar": "powershell -ExecutionPolicy Bypass -File ./scripts/reinstalar-caja.ps1",
+    "install:caja": "npm install",
+    "pruebas": "powershell -ExecutionPolicy Bypass -File ./scripts/ejecutar-pruebas.ps1",
+    "test": "npm run pruebas",
+    "typecheck": "tsc --noEmit",
     "watch": "tsc --watch",
     "clean": "rm -rf dist"
+  },
+  "engines": {
+    "node": ">=18 <=20"
   },
   "keywords": [
     "printer",
@@ -18,11 +27,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@thiagoelg/node-printer": "^0.6.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
-    "node-thermal-printer": "^4.5.0",
     "pusher-js": "^8.4.0"
   },
   "devDependencies": {
