@@ -1,12 +1,23 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.websocketService = void 0;
-const pusher_js_1 = __importDefault(require("pusher-js"));
+exports.decodePrintTexto = decodePrintTexto;
 const config_1 = require("../config/config");
+const pusher_client_1 = require("../lib/pusher-client");
 const printer_service_1 = require("./printer.service");
+/**
+ * Decodifica texto ESC/POS del evento Reverb (base64) o legado (crudo).
+ */
+function decodePrintTexto(data) {
+    const raw = String(data.texto ?? '');
+    if (data.texto_encoding === 'base64') {
+        if (!raw) {
+            return '';
+        }
+        return Buffer.from(raw, 'base64').toString('latin1');
+    }
+    return raw;
+}
 /**
  * Servicio para manejar la conexión WebSocket con Laravel Reverb
  */
@@ -48,13 +59,17 @@ class WebSocketService {
         // Extraer host y port de la URL
         const url = new URL(config_1.config.websocket.serverUrl);
         const wsHost = url.hostname;
-        const wsPort = parseInt(url.port) || 8080;
+        const wsPort = parseInt(url.port, 10) || (url.protocol === 'wss:' ? 443 : 80);
+        const useTls = url.protocol === 'wss:';
         // Configurar Pusher para conectar a Laravel Reverb
-        this.pusher = new pusher_js_1.default(config_1.config.websocket.appKey, {
+        // Mismo criterio que Laravel Echo en el frontend: con TLS, permitir ws+wss
+        // (solo ['wss'] deja la conexión en "failed" en Node/pusher-js).
+        this.pusher = (0, pusher_client_1.createPusher)(config_1.config.websocket.appKey, {
             wsHost: wsHost,
             wsPort: wsPort,
-            forceTLS: false,
-            enabledTransports: ['ws', 'wss'],
+            wssPort: wsPort,
+            forceTLS: useTls,
+            enabledTransports: useTls ? ['ws', 'wss'] : ['ws'],
             disableStats: true,
             cluster: 'mt1' // Requerido pero ignorado por Reverb
         });
@@ -94,6 +109,12 @@ class WebSocketService {
         this.pusher.connection.bind('error', (error) => {
             console.error('❌ Error de conexión:', error);
         });
+        this.pusher.connection.bind('failed', () => {
+            console.error('❌ WebSocket en estado failed. Verifique Reverb en el VPS (docker ps | grep reverb) y que', config_1.config.websocket.serverUrl, 'responda en /app (no 502).');
+        });
+        this.pusher.connection.bind('unavailable', () => {
+            console.error('❌ WebSocket no disponible (unavailable). Revise red/firewall hacia el servidor Reverb.');
+        });
         // Estado cambiado
         this.pusher.connection.bind('state_change', (states) => {
             console.log(`🔄 Estado: ${states.previous} -> ${states.current}`);
@@ -127,26 +148,59 @@ class WebSocketService {
         // PrinterCommandEvent
         // Escuchar evento de impresión (Laravel Reverb usa el nombre del evento del broadcast)
         this.channel.bind('print-command', async (data) => {
-            console.log('');
-            console.log('═══════════════════════════════════════════════════════');
-            console.log('📄 COMANDO DE IMPRESIÓN RECIBIDO');
-            console.log('═══════════════════════════════════════════════════════');
-            console.log('   Datos recibidos:', JSON.stringify(data, null, 2));
-            console.log('═══════════════════════════════════════════════════════');
-            console.log('');
-            // El evento viene con la estructura de Laravel
-            const command = {
-                job_id: data.job_id,
-                caja_id: data.caja_id,
-                target_id: data.target_id,
-                target_type: data.target_type,
-                texto: data.texto,
-                tipo_impresion: data.tipo_impresion,
-                metadata: data.metadata || {},
-                timestamp: data.timestamp || new Date().toISOString()
-            };
-            await this.handlePrintCommand(command);
+            await this.onPrintCommandReceived(data, { source: 'websocket' });
         });
+    }
+    /**
+     * Parsear payload del evento print-command (Laravel / Reverb).
+     */
+    parsePrintCommand(data) {
+        return {
+            job_id: String(data.job_id ?? ''),
+            caja_id: Number(data.caja_id ?? 0),
+            target_id: data.target_id != null ? Number(data.target_id) : undefined,
+            target_type: data.target_type != null ? String(data.target_type) : undefined,
+            texto: decodePrintTexto(data),
+            tipo_impresion: String(data.tipo_impresion ?? 'ticket'),
+            metadata: data.metadata || {},
+            timestamp: String(data.timestamp ?? new Date().toISOString()),
+        };
+    }
+    /**
+     * Mismo flujo que el WebSocket; útil para debug local (POST /debug/simulate-print-event).
+     */
+    async onPrintCommandReceived(data, options = {}) {
+        const source = options.source ?? 'manual';
+        const imprimir = options.imprimir !== false;
+        console.log('');
+        console.log('═══════════════════════════════════════════════════════');
+        console.log(`📄 COMANDO DE IMPRESIÓN RECIBIDO [${source}]`);
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('   Datos recibidos:', JSON.stringify(data, null, 2));
+        console.log(`   imprimir: ${imprimir}`);
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('');
+        const raw = (data && typeof data === 'object' ? data : {});
+        const command = this.parsePrintCommand(raw);
+        const targetId = config_1.config.modo === 'puerta' ? config_1.config.puerta.id : config_1.config.caja.id;
+        const commandTargetId = command.target_id ?? command.caja_id;
+        if (commandTargetId !== targetId) {
+            const targetType = config_1.config.modo === 'puerta' ? 'puerta' : 'caja';
+            console.log(`⚠️  Comando ignorado: es para ${targetType} ${commandTargetId}, este es ${targetType} ${targetId}`);
+            return { processed: false, ignored: true };
+        }
+        if (!imprimir) {
+            console.log('ℹ️  Modo solo-log: no se envía a impresora (imprimir=false)');
+            return { processed: true, printed: false };
+        }
+        try {
+            await this.handlePrintCommand(command);
+            return { processed: true, printed: true };
+        }
+        catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return { processed: true, printed: false, error: msg };
+        }
     }
     /**
      * Manejar comando de impresión recibido

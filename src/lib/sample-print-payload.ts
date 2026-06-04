@@ -52,5 +52,13 @@ export function buildSamplePrintEvent(overrides?: Partial<PrintCommand>): Record
         },
     };
 
-    return { ...base, ...overrides } as Record<string, unknown>;
+    const payload = { ...base, ...overrides } as Record<string, unknown>;
+
+    // Mismo formato que Laravel Reverb tras el fix de encoding
+    if (payload.texto_encoding !== 'base64' && typeof payload.texto === 'string') {
+        payload.texto = Buffer.from(payload.texto, 'latin1').toString('base64');
+        payload.texto_encoding = 'base64';
+    }
+
+    return payload;
 }

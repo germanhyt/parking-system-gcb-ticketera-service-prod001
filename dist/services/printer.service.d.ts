@@ -1,30 +1,26 @@
-/**
- * Resultado de una operación de impresión
- */
 interface PrintResult {
     success: boolean;
     printerJobId?: string;
     error?: string;
 }
-/**
- * Servicio para manejar operaciones de impresión
- */
 declare class PrinterService {
-    /**
-     * Imprimir texto en la impresora configurada
-     */
+    private useNative;
+    private printerExistsViaPowerShell;
     print(texto: string): Promise<PrintResult>;
-    /**
-     * Verificar si la impresora está disponible
-     */
+    private printNative;
+    private printPowerShell;
     isPrinterAvailable(): boolean;
-    /**
-     * Obtener información de la impresora
-     */
+    isPrinterAvailableAsync(): Promise<boolean>;
     getPrinterInfo(): {
         name: string;
         available: boolean;
+        driver: string;
     };
+    getPrinterInfoAsync(): Promise<{
+        name: string;
+        available: boolean;
+        driver: string;
+    }>;
 }
 export declare const printerService: PrinterService;
 export {};

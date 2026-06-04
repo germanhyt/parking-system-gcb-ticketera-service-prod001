@@ -4,6 +4,20 @@ import { PrintCommand, PrintResult } from '../types';
 import { printerService } from './printer.service';
 
 /**
+ * Decodifica texto ESC/POS del evento Reverb (base64) o legado (crudo).
+ */
+export function decodePrintTexto(data: Record<string, unknown>): string {
+    const raw = String(data.texto ?? '');
+    if (data.texto_encoding === 'base64') {
+        if (!raw) {
+            return '';
+        }
+        return Buffer.from(raw, 'base64').toString('latin1');
+    }
+    return raw;
+}
+
+/**
  * Servicio para manejar la conexión WebSocket con Laravel Reverb
  */
 class WebSocketService {
@@ -51,12 +65,14 @@ class WebSocketService {
         const useTls = url.protocol === 'wss:';
 
         // Configurar Pusher para conectar a Laravel Reverb
+        // Mismo criterio que Laravel Echo en el frontend: con TLS, permitir ws+wss
+        // (solo ['wss'] deja la conexión en "failed" en Node/pusher-js).
         this.pusher = createPusher(config.websocket.appKey, {
             wsHost: wsHost,
             wsPort: wsPort,
             wssPort: wsPort,
             forceTLS: useTls,
-            enabledTransports: useTls ? ['wss'] : ['ws'],
+            enabledTransports: useTls ? ['ws', 'wss'] : ['ws'],
             disableStats: true,
             cluster: 'mt1' // Requerido pero ignorado por Reverb
         });
@@ -101,8 +117,20 @@ class WebSocketService {
         });
 
         // Error de conexión
-        this.pusher.connection.bind('error', (error: any) => {
+        this.pusher.connection.bind('error', (error: unknown) => {
             console.error('❌ Error de conexión:', error);
+        });
+
+        this.pusher.connection.bind('failed', () => {
+            console.error(
+                '❌ WebSocket en estado failed. Verifique Reverb en el VPS (docker ps | grep reverb) y que',
+                config.websocket.serverUrl,
+                'responda en /app (no 502).'
+            );
+        });
+
+        this.pusher.connection.bind('unavailable', () => {
+            console.error('❌ WebSocket no disponible (unavailable). Revise red/firewall hacia el servidor Reverb.');
         });
 
         // Estado cambiado
@@ -156,7 +184,7 @@ class WebSocketService {
             caja_id: Number(data.caja_id ?? 0),
             target_id: data.target_id != null ? Number(data.target_id) : undefined,
             target_type: data.target_type != null ? String(data.target_type) : undefined,
-            texto: String(data.texto ?? ''),
+            texto: decodePrintTexto(data),
             tipo_impresion: String(data.tipo_impresion ?? 'ticket'),
             metadata: (data.metadata as PrintCommand['metadata']) || {},
             timestamp: String(data.timestamp ?? new Date().toISOString()),

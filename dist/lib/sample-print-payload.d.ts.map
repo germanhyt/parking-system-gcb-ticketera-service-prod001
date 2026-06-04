@@ -1,0 +1,1 @@
+{"version":3,"file":"sample-print-payload.d.ts","sourceRoot":"","sources":["../../src/lib/sample-print-payload.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,YAAY,EAAE,MAAM,UAAU,CAAC;AAExC;;GAEG;AACH,wBAAgB,qBAAqB,CAAC,KAAK,EAAE,MAAM,EAAE,KAAK,EAAE,MAAM,GAAG,MAAM,CAkB1E;AAED;;GAEG;AACH,wBAAgB,qBAAqB,CAAC,SAAS,CAAC,EAAE,OAAO,CAAC,YAAY,CAAC,GAAG,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC,CAkChG"}

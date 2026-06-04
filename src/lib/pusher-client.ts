@@ -28,14 +28,16 @@ type PusherConstructor = new (
 
 function getPusherConstructor(): PusherConstructor {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('pusher-js') as {
-        Pusher?: PusherConstructor;
-        default?: PusherConstructor;
-    };
-    // Node build exporta module.exports.Pusher (ver dist/node/pusher.js)
-    const Ctor = mod.Pusher ?? mod.default;
+    const mod = require('pusher-js') as
+        | PusherConstructor
+        | { Pusher?: PusherConstructor; default?: PusherConstructor };
+    // En Node, pusher-js suele exportar el constructor como función (module.exports = Pusher)
+    const Ctor =
+        typeof mod === 'function'
+            ? mod
+            : mod.Pusher ?? mod.default;
     if (typeof Ctor !== 'function') {
-        throw new Error('pusher-js: no se pudo cargar el constructor (falta exports.Pusher)');
+        throw new Error('pusher-js: no se pudo cargar el constructor Pusher');
     }
     return Ctor;
 }
