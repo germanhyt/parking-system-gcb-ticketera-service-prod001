@@ -28,11 +28,21 @@ class WebSocketService {
             return;
         }
         console.log('');
-        console.log(`📍 Sede: ${config_1.config.caja.sedeNombre} (Caja ${config_1.config.caja.codigo})`);
-        console.log(`🆔 Caja ID: ${config_1.config.caja.id}`);
-        console.log(`🖨️  Impresora: ${config_1.config.printer.name}`);
-        console.log(`🔌 Servidor: ${config_1.config.websocket.serverUrl}`);
-        console.log(`📡 Canal: printer.caja.${config_1.config.caja.id}`);
+        // Mostrar información según modo
+        if (config_1.config.modo === 'puerta') {
+            console.log(`📍 Sede: ${config_1.config.puerta.sedeNombre}`);
+            console.log(`🚪 Puerta: ${config_1.config.puerta.numero} (ID: ${config_1.config.puerta.id})`);
+            console.log(`🖨️  Impresora: ${config_1.config.printer.name}`);
+            console.log(`🔌 Servidor: ${config_1.config.websocket.serverUrl}`);
+            console.log(`📡 Canal: printer.puerta.${config_1.config.puerta.id}`);
+        }
+        else {
+            console.log(`📍 Sede: ${config_1.config.caja.sedeNombre} (Caja ${config_1.config.caja.codigo})`);
+            console.log(`🆔 Caja ID: ${config_1.config.caja.id}`);
+            console.log(`🖨️  Impresora: ${config_1.config.printer.name}`);
+            console.log(`🔌 Servidor: ${config_1.config.websocket.serverUrl}`);
+            console.log(`📡 Canal: printer.caja.${config_1.config.caja.id}`);
+        }
         console.log('═══════════════════════════════════════════════════════');
         console.log('');
         // Extraer host y port de la URL
@@ -50,8 +60,10 @@ class WebSocketService {
         });
         // Configurar event handlers de conexión
         this.setupConnectionHandlers();
-        // Suscribirse al canal específico de la caja
-        const channelName = `printer.caja.${config_1.config.caja.id}`;
+        // Suscribirse al canal según modo
+        const channelName = config_1.config.modo === 'puerta'
+            ? `printer.puerta.${config_1.config.puerta.id}`
+            : `printer.caja.${config_1.config.caja.id}`;
         this.channel = this.pusher.subscribe(channelName);
         // Configurar listeners de eventos del canal
         this.setupChannelHandlers();
@@ -65,9 +77,12 @@ class WebSocketService {
         // Conexión establecida
         this.pusher.connection.bind('connected', () => {
             this.isConnected = true;
+            const channelName = config_1.config.modo === 'puerta'
+                ? `printer.puerta.${config_1.config.puerta.id}`
+                : `printer.caja.${config_1.config.caja.id}`;
             console.log('✅ Conectado al servidor WebSocket (Reverb)');
             console.log(`   Socket ID: ${this.pusher?.connection.socket_id}`);
-            console.log(`   Escuchando canal: printer.caja.${config_1.config.caja.id}`);
+            console.log(`   Escuchando canal: ${channelName}`);
             console.log('');
         });
         // Desconectado
@@ -109,8 +124,9 @@ class WebSocketService {
         this.channel.bind('pusher:subscription_error', (error) => {
             console.error('❌ Error al suscribirse al canal:', error);
         });
+        // PrinterCommandEvent
         // Escuchar evento de impresión (Laravel Reverb usa el nombre del evento del broadcast)
-        this.channel.bind('PrinterCommandEvent', async (data) => {
+        this.channel.bind('print-command', async (data) => {
             console.log('');
             console.log('═══════════════════════════════════════════════════════');
             console.log('📄 COMANDO DE IMPRESIÓN RECIBIDO');
@@ -122,6 +138,8 @@ class WebSocketService {
             const command = {
                 job_id: data.job_id,
                 caja_id: data.caja_id,
+                target_id: data.target_id,
+                target_type: data.target_type,
                 texto: data.texto,
                 tipo_impresion: data.tipo_impresion,
                 metadata: data.metadata || {},
@@ -136,19 +154,36 @@ class WebSocketService {
     async handlePrintCommand(command) {
         const startTime = Date.now();
         try {
-            // Verificar que el comando es para esta caja
-            if (command.caja_id !== config_1.config.caja.id) {
-                console.log(`⚠️  Comando ignorado: es para caja ${command.caja_id}, esta es caja ${config_1.config.caja.id}`);
+            // Verificar que el comando es para este dispositivo
+            const targetId = config_1.config.modo === 'puerta' ? config_1.config.puerta.id : config_1.config.caja.id;
+            const commandTargetId = command.target_id || command.caja_id;
+            if (commandTargetId !== targetId) {
+                const targetType = config_1.config.modo === 'puerta' ? 'puerta' : 'caja';
+                console.log(`⚠️  Comando ignorado: es para ${targetType} ${commandTargetId}, este es ${targetType} ${targetId}`);
                 return;
             }
             console.log('');
             console.log('═══════════════════════════════════════════════════════');
-            console.log('🖨️  PROCESANDO IMPRESIÓN');
+            console.log(`🖨️  PROCESANDO IMPRESIÓN - MODO: ${config_1.config.modo.toUpperCase()}`);
             console.log('═══════════════════════════════════════════════════════');
             console.log(`   Job ID: ${command.job_id}`);
             console.log(`   Tipo: ${command.tipo_impresion}`);
-            console.log(`   Ticket: ${command.metadata.numero_ticket || 'N/A'}`);
-            console.log(`   Placa: ${command.metadata.placa || 'N/A'}`);
+            // Mostrar información relevante según el tipo
+            if (command.tipo_impresion === 'comprobante') {
+                console.log(`   Serie: ${command.metadata.serie_numero || 'N/A'}`);
+                console.log(`   Tipo Comprobante: ${command.metadata.tipo || 'N/A'}`);
+            }
+            else {
+                console.log(`   Ticket: ${command.metadata.numero_ticket || 'N/A'}`);
+                console.log(`   Placa: ${command.metadata.placa || 'N/A'}`);
+            }
+            // Mostrar puerta o caja
+            if (config_1.config.modo === 'puerta') {
+                console.log(`   Puerta: ${config_1.config.puerta.numero}`);
+            }
+            else {
+                console.log(`   Caja: ${config_1.config.caja.codigo}`);
+            }
             console.log('═══════════════════════════════════════════════════════');
             console.log('');
             // Imprimir usando el servicio de impresión
@@ -163,7 +198,8 @@ class WebSocketService {
                 // Enviar resultado exitoso al servidor
                 const printResult = {
                     job_id: command.job_id,
-                    caja_id: config_1.config.caja.id,
+                    caja_id: config_1.config.modo === 'caja' ? config_1.config.caja.id : 0,
+                    ...(config_1.config.modo === 'puerta' ? { puerta_id: config_1.config.puerta.id } : {}),
                     success: true,
                     printer_job_id: result.printerJobId,
                     duration_ms: duration
@@ -187,7 +223,8 @@ class WebSocketService {
             // Enviar resultado de error al servidor
             const printResult = {
                 job_id: command.job_id,
-                caja_id: config_1.config.caja.id,
+                caja_id: config_1.config.modo === 'caja' ? config_1.config.caja.id : 0,
+                ...(config_1.config.modo === 'puerta' ? { puerta_id: config_1.config.puerta.id } : {}),
                 success: false,
                 error: errorMsg,
                 duration_ms: duration
@@ -202,7 +239,11 @@ class WebSocketService {
     disconnect() {
         if (this.channel) {
             this.channel.unbind_all();
-            this.pusher?.unsubscribe(`printer.caja.${config_1.config.caja.id}`);
+            const channelName = config_1.config.modo === 'puerta'
+                ? `printer.puerta.${config_1.config.puerta.id}`
+                : `printer.caja.${config_1.config.caja.id}`;
+            this.pusher?.unsubscribe(channelName);
+            this.channel = null;
         }
         if (this.pusher) {
             this.pusher.disconnect();

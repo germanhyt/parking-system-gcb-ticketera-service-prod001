@@ -3,6 +3,8 @@
  */
 export interface PrintCommand {
     caja_id: number;
+    target_id?: number;
+    target_type?: string;
     texto: string;
     job_id: string;
     tipo_impresion: string;
@@ -14,12 +16,19 @@ export interface PrintCommand {
         sede_nombre?: string;
         sede_id?: number;
         timestamp?: string;
+        tipo?: string;
+        serie_numero?: string;
+        puerta_numero?: string;
+        puerta_descripcion?: string;
     };
     timestamp: string;
 }
 export interface PrintResult {
     job_id: string;
+    /** ID de caja cuando MODO=caja (0 si solo aplica puerta). */
     caja_id: number;
+    /** ID de puerta cuando MODO=puerta. */
+    puerta_id?: number;
     success: boolean;
     error?: string;
     printer_job_id?: string;
@@ -27,8 +36,11 @@ export interface PrintResult {
 }
 export interface AgentStatus {
     status: 'online' | 'offline' | 'error';
-    caja_id: number;
-    caja_codigo: string;
+    modo: 'caja' | 'puerta';
+    caja_id?: number;
+    puerta_id?: number;
+    caja_codigo?: string;
+    puerta_numero?: string;
     sede_nombre: string;
     websocket: {
         connected: boolean;
@@ -45,9 +57,16 @@ export interface Config {
         serverUrl: string;
         appKey: string;
     };
+    modo: 'caja' | 'puerta';
     caja: {
         id: number;
         codigo: string;
+        sedeNombre: string;
+    };
+    puerta: {
+        id: number;
+        numero: string;
+        sedeId: number;
         sedeNombre: string;
     };
     printer: {

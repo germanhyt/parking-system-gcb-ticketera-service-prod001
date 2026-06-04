@@ -22,7 +22,7 @@ class PrinterService {
             // Verificar impresora
             console.log(`🔍 Buscando impresora: ${config.printer.name}...`);
             const impresora = printer.getPrinter(config.printer.name);
-            
+
             if (!impresora) {
                 const error = `Impresora "${config.printer.name}" no encontrada en el sistema`;
                 console.error(`❌ ${error}`);
@@ -32,7 +32,7 @@ class PrinterService {
                 });
                 return;
             }
-            
+
             console.log('✅ Impresora encontrada');
             console.log('📤 Enviando a imprimir...');
 

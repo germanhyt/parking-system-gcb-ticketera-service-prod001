@@ -223,7 +223,8 @@ class WebSocketService {
                 // Enviar resultado exitoso al servidor
                 const printResult: PrintResult = {
                     job_id: command.job_id,
-                    caja_id: config.caja.id,
+                    caja_id: config.modo === 'caja' ? config.caja.id : 0,
+                    ...(config.modo === 'puerta' ? { puerta_id: config.puerta.id } : {}),
                     success: true,
                     printer_job_id: result.printerJobId,
                     duration_ms: duration
@@ -249,7 +250,8 @@ class WebSocketService {
             // Enviar resultado de error al servidor
             const printResult: PrintResult = {
                 job_id: command.job_id,
-                caja_id: config.caja.id,
+                caja_id: config.modo === 'caja' ? config.caja.id : 0,
+                ...(config.modo === 'puerta' ? { puerta_id: config.puerta.id } : {}),
                 success: false,
                 error: errorMsg,
                 duration_ms: duration
@@ -266,7 +268,12 @@ class WebSocketService {
     public disconnect(): void {
         if (this.channel) {
             this.channel.unbind_all();
-            this.pusher?.unsubscribe(`printer.caja.${config.caja.id}`);
+            const channelName =
+                config.modo === 'puerta'
+                    ? `printer.puerta.${config.puerta.id}`
+                    : `printer.caja.${config.caja.id}`;
+            this.pusher?.unsubscribe(channelName);
+            this.channel = null;
         }
         if (this.pusher) {
             this.pusher.disconnect();

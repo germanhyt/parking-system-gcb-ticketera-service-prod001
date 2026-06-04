@@ -30,7 +30,10 @@ export interface PrintCommand {
 
 export interface PrintResult {
     job_id: string;
+    /** ID de caja cuando MODO=caja (0 si solo aplica puerta). */
     caja_id: number;
+    /** ID de puerta cuando MODO=puerta. */
+    puerta_id?: number;
     success: boolean;
     error?: string;
     printer_job_id?: string;

@@ -1,9 +1,7 @@
 
 
 
-
-
-┌───────────────────────────────────────────────────────────────────────────────┐
+──────────────────────────────────────────────────────────────────────────────┐
 │                            VPS CONTABO (Producción)                           │
 │  ┌─────────────────┐        ┌─────────────────────┐                          │
 │  │   Laravel API   │───────▶│   Laravel Reverb    │                          │
@@ -75,6 +73,227 @@
 
 
 
+-----------------------------------------------------------
+-----------------------------------------------------------
+PM2 - GESTOR DE PROCESOS
+-----------------------------------------------------------
+-----------------------------------------------------------
+
+¿QUÉ ES PM2?
+PM2 (Process Manager 2) es un gestor de procesos de producción para aplicaciones Node.js. 
+Es una herramienta diseñada para mantener aplicaciones ejecutándose en segundo plano 
+(daemonizadas) de forma permanente, asegurando que el servicio de la ticketera 
+esté siempre disponible.
+
+FUNCIONALIDADES PRINCIPALES:
+1. Daemonización: Ejecuta el servicio en segundo plano sin terminales abiertas.
+2. Auto-Restart: Si el programa falla, PM2 lo levanta de inmediato.
+3. Gestión de Logs: Guarda automáticamente todo lo que sucede (errores y eventos).
+4. Persistencia: Con pm2-windows-startup, el servicio arranca solo al prender la PC.
+5. Monitoreo: Permite ver el consumo de CPU y memoria en tiempo real.
+
+CICLO DE VIDA DEL PROCESO:
+-----------------------------------------------------------
+| Estado    | Descripción                                 |
+|-----------|---------------------------------------------|
+| Online    | Funcionando correctamente.                  |
+| Starting  | Iniciando el programa.                      |
+| Stopping  | Cerrando de forma segura.                   |
+| Stopped   | Detenido manualmente por el administrador.  |
+| Errored   | Falló repetidamente (revisar logs).         |
+-----------------------------------------------------------
 
 
+## 🔄 Ciclo de Vida del Proceso
 
+Un proceso gestionado por PM2 puede pasar por los siguientes estados:
+
+| Estado | Descripción |
+| :--- | :--- |
+| **Online** | El proceso está funcionando correctamente. |
+| **Starting** | El proceso se está iniciando (fase de carga). |
+| **Stopping** | Se ha enviado una señal para cerrar el proceso de forma segura. |
+| **Stopped** | El proceso ha sido detenido manualmente por el usuario. |
+| **Errored** | El proceso ha fallado repetidamente y PM2 ha dejado de intentar reiniciarlo (requiere revisión de logs). |
+| **Centinela (Watch)** | (Si está activo) El proceso se reinicia automáticamente si se detectan cambios en los archivos fuente. |
+
+---
+
+## 📋 Guía de Automatización (Instrucciones)
+
+Este flujo configura el agente de la ticketera para que se ejecute en segundo plano y se inicie automáticamente al encender la computadora.
+
+### 1. Requisitos Previos
+Instalar PM2 y el configurador de inicio para Windows de forma global:
+```powershell
+npm install -g pm2 pm2-windows-startup
+```
+
+### 2. Configurar el inicio automático
+Registrar PM2 en el registro de Windows para que inicie al arrancar el sistema:
+```powershell
+pm2-startup install
+```
+
+### 3. Compilar el Proyecto
+Asegurarse de que el código TypeScript esté transpilado a JavaScript:
+```powershell
+npm run build
+```
+
+### 4. Registrar el Servicio
+Iniciar el proceso y asignarle un nombre único:
+```powershell
+pm2 start dist/index.js --name "ticketera-puerta-1"
+```
+
+### 5. Persistir Configuración
+**Crucial:** Guardar la lista actual de procesos para que PM2 los restaure después de un reinicio:
+```powershell
+pm2 save
+```
+
+
+-----------------------------------------------------------
+CÓMO AUTOMATIZAR EL SERVICIO EN WINDOWS USANDO PM2
+-----------------------------------------------------------
+
+
+…\parking-system-gcb-ticketera-comunication-prod001 > pm2 -v
+
+…\parking-system-gcb-ticketera-comunication-prod001 > npm install -g pm2 pm2-windows-startup
+
+
+…\parking-system-gcb-ticketera-comunication-prod001 > pm2-startup install
+
+
+…\parking-system-gcb-ticketera-comunication-prod001 > where pm2-startup
+
+
+…\parking-system-gcb-ticketera-comunication-prod001 > npm config get prefix
+
+…\parking-system-gcb-ticketera-comunication-prod001 > cmd /c pm2-startup install
+
+…\parking-system-gcb-ticketera-comunication-prod001 > cmd /c "pm2 start dist/index.js --name ticketera-puerta-1"
+
+
+----------------------------------------------
+
+__/\\\\\\\\\\\\\____/\\\\____________/\\\\____/\\\\\\\\\_____
+ _\/\\\/////////\\\_\/\\\\\\________/\\\\\\__/\\\///////\\\___
+  _\/\\\_______\/\\\_\/\\\//\\\____/\\\//\\\_\///______\//\\\__
+   _\/\\\\\\\\\\\\\/__\/\\\\///\\\/\\\/_\/\\\___________/\\\/___
+    _\/\\\/////////____\/\\\__\///\\\/___\/\\\________/\\\//_____
+     _\/\\\_____________\/\\\____\///_____\/\\\_____/\\\//________
+      _\/\\\_____________\/\\\_____________\/\\\___/\\\/___________
+       _\/\\\_____________\/\\\_____________\/\\\__/\\\\\\\\\\\\\\\_
+        _\///______________\///______________\///__\///////////////__
+
+
+                          Runtime Edition
+
+        PM2 is a Production Process Manager for Node.js applications
+                     with a built-in Load Balancer.
+
+                Start and Daemonize any application:
+                $ pm2 start app.js
+
+                Load Balance 4 instances of api.js:
+                $ pm2 start api.js -i 4
+
+                Monitor in production:
+                $ pm2 monitor
+
+                Make pm2 auto-boot at server restart:
+                $ pm2 startup
+
+                To go further checkout:
+                http://pm2.io/
+
+
+                        -------------
+
+[PM2] Spawning PM2 daemon with pm2_home=C:\Users\gcbso\.pm2
+[PM2] PM2 Successfully daemonized
+[PM2] Starting C:\Users\gcbso\Downloads\SISTEMA ESTACIONAMIENTO\Implementación sistema\V2\parking-system-gcb-ticketera-comunication-prod001\dist\index.js in fork_mode (1 instance)
+[PM2] Done.
+┌────┬───────────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name                  │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ ticketera-puerta-1    │ default     │ 1.0.0   │ fork    │ 30552    │ 0s     │ 0    │ online    │ 0%       │ 0b       │ gcbso    │ disabled │
+└────┴───────────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+
+----------------------------------------------
+
+…\parking-system-gcb-ticketera-comunication-prod001 > cmd /c pm2 save
+[PM2] Saving current process list...
+[PM2] Successfully saved in C:\Users\gcbso\.pm2\dump.pm2
+
+
+…\parking-system-gcb-ticketera-comunication-prod001 > cmd /c pm2 logs ticketera-puerta-1 --lines 20 --no-daemon
+
+…\parking-system-gcb-ticketera-comunication-prod001 > cmd /c pm2 status
+
+-----------------------------------------------------------
+-----------------------------------------------------------
+
+Este flujo de trabajo configura el agente de la ticketera para que se ejecute en segundo plano y se inicie automáticamente al encender la computadora.
+
+### 1. Requisitos Previos
+// turbo
+- Instalar PM2 y el configurador de inicio para Windows:
+```powershell
+npm install -g pm2 pm2-windows-startup
+```
+
+### 2. Configurar el inicio automático de PM2
+// turbo
+- Registrar PM2 en el registro de Windows para que inicie al arrancar:
+```powershell
+pm2-startup install
+```
+
+### 3. Compilar el Proyecto
+// turbo
+- Asegurarse de que el proyecto esté compilado:
+```powershell
+cd "c:\Users\gcbso\Downloads\SISTEMA ESTACIONAMIENTO\Implementación sistema\V2\parking-system-gcb-ticketera-comunication-prod001"
+npm run build
+```
+
+### 4. Registrar el Servicio en PM2
+// turbo
+- Iniciar el proceso y darle un nombre descriptivo:
+```powershell
+pm2 start dist/index.js --name "ticketera-puerta-1"
+```
+
+### 5. Guardar la configuración
+// turbo
+- Guardar la lista actual de procesos para que PM2 los restaure al reiniciar:
+```powershell
+pm2 save
+```
+
+### Comandos Útiles de Gestión
+- **Ver estado:** `pm2 status`
+- **Ver logs:** `pm2 logs ticketera-puerta-1`
+- **Reiniciar:** `pm2 restart ticketera-puerta-1`
+- **Detener:** `pm2 stop ticketera-puerta-1`
+
+-----------------------------------------------------------
+-----------------------------------------------------------
+
+En Developers Settings -> Personal access tokens (classic)
+git remote set-url origin https://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@github.com/germanhyt/parking-system-gcb-frontend-prod002.git 
+git remote set-url origin https://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@github.com/germanhyt/parking-system-gcb-backend-prod-002.git 
+
+-----------------------------------------------------------
+-----------------------------------------------------------
+
+REQUERIMIENTOS PARA INSTALACIÓN DE SERVICIOS EN MÁQUINA DE CAJAS:
+python 3.12.9
+visual studio  c++ (programa de escritorio)
+
+-----------------------------------------------------------
+-----------------------------------------------------------

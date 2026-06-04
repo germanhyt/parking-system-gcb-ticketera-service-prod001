@@ -32,9 +32,18 @@ exports.config = {
         serverUrl: getEnvVar('WEBSOCKET_SERVER_URL'),
         appKey: getEnvVar('WEBSOCKET_APP_KEY'),
     },
+    // NUEVO: Modo de operación (caja o puerta)
+    modo: getEnvVar('MODO', 'caja'),
     caja: {
-        id: getEnvNumber('CAJA_ID', 1),
+        id: getEnvNumber('CAJA_ID', 0),
         codigo: getEnvVar('CAJA_CODIGO', '001'),
+        sedeNombre: getEnvVar('SEDE_NOMBRE', 'Sin sede'),
+    },
+    // NUEVO: Configuración de puerta
+    puerta: {
+        id: getEnvNumber('PUERTA_ID', 0),
+        numero: getEnvVar('PUERTA_NUMERO', 'Puerta 1'),
+        sedeId: getEnvNumber('SEDE_ID', 1),
         sedeNombre: getEnvVar('SEDE_NOMBRE', 'Sin sede'),
     },
     printer: {
