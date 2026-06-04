@@ -73,6 +73,7 @@ class WebSocketService {
             disableStats: true,
             cluster: 'mt1' // Requerido pero ignorado por Reverb
         });
+        console.log(`🔄 Conectando a Reverb (${wsHost}:${wsPort}, TLS=${useTls})...`);
         // Configurar event handlers de conexión
         this.setupConnectionHandlers();
         // Suscribirse al canal según modo
@@ -121,8 +122,15 @@ class WebSocketService {
         });
         // Reconectando
         this.pusher.connection.bind('connecting', () => {
-            console.log('🔄 Conectando al servidor...');
+            console.log('🔄 Estado: connecting (handshake WebSocket)...');
         });
+        // Si en ~20s no hay connected/failed, suele ser red, código viejo o solo transport wss
+        setTimeout(() => {
+            const state = this.pusher?.connection.state;
+            if (!this.isConnected && state && state !== 'connected') {
+                console.error(`❌ WebSocket sigue en "${state}" tras 20s. En esta PC: git pull, npm run build, Node 18-20,`, 'y .env con CAJA_ID de ESTA caja. Pruebe: curl http://localhost:4000/status');
+            }
+        }, 20000);
         // Reconexión exitosa
         this.pusher.connection.bind('connected', () => {
             if (this.isConnected) {
