@@ -74,7 +74,8 @@ class PrinterService {
                 '-File', path.join(scriptsDir(), 'impresora-existe.ps1'),
                 '-PrinterName', config_1.config.printer.name
             ], { timeout: 15000, windowsHide: true });
-            return stdout.toString().trim() === 'OK';
+            // El script responde "OK" o "OK:<nombre real>" si la encuentra (match tolerante)
+            return stdout.toString().trim().startsWith('OK');
         }
         catch {
             return false;

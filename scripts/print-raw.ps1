@@ -9,6 +9,27 @@ if (-not (Test-Path $FilePath)) {
     exit 1
 }
 
+# Resolver el nombre REAL de la impresora (tolerante a mayusculas/espacios)
+function Normalize([string]$s) {
+    if ($null -eq $s) { return '' }
+    return (($s -replace '\s+', ' ').Trim())
+}
+$target = Normalize $PrinterName
+$printers = Get-Printer -ErrorAction SilentlyContinue
+$resolved = ($printers | Where-Object { (Normalize $_.Name) -ieq $target } | Select-Object -First 1).Name
+if (-not $resolved -and $target.Length -ge 3) {
+    $resolved = ($printers | Where-Object {
+        $n = Normalize $_.Name
+        $n -like "*$target*" -or $target -like "*$n*"
+    } | Select-Object -First 1).Name
+}
+if ($resolved) {
+    $PrinterName = $resolved
+} else {
+    Write-Error "Impresora no encontrada: $PrinterName"
+    exit 3
+}
+
 $bytes = [System.IO.File]::ReadAllBytes($FilePath)
 
 Add-Type -TypeDefinition @"
