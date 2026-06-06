@@ -70,10 +70,13 @@ class PrinterService {
     async printerExistsViaPowerShell() {
         try {
             const { stdout } = await execFileAsync('powershell.exe', [
+                '-NoProfile',
                 '-ExecutionPolicy', 'Bypass',
                 '-File', path.join(scriptsDir(), 'impresora-existe.ps1'),
                 '-PrinterName', config_1.config.printer.name
-            ], { timeout: 15000, windowsHide: true });
+            ], 
+            // En algunas PCs de caja, powershell.exe falla al iniciar desde Node con windowsHide=true.
+            { timeout: 15000, windowsHide: false });
             // El script responde "OK" o "OK:<nombre real>" si la encuentra (match tolerante)
             return stdout.toString().trim().startsWith('OK');
         }
@@ -122,11 +125,12 @@ class PrinterService {
             const buffer = Buffer.from(texto, 'binary');
             fs.writeFileSync(tmpFile, buffer);
             await execFileAsync('powershell.exe', [
+                '-NoProfile',
                 '-ExecutionPolicy', 'Bypass',
                 '-File', path.join(scriptsDir(), 'print-raw.ps1'),
                 '-PrinterName', config_1.config.printer.name,
                 '-FilePath', tmpFile
-            ], { timeout: 60000, windowsHide: true });
+            ], { timeout: 60000, windowsHide: false });
             return { success: true, printerJobId: 'powershell-raw' };
         }
         catch (err) {
