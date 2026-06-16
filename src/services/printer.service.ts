@@ -63,8 +63,8 @@ class PrinterService {
                     '-File', path.join(scriptsDir(), 'impresora-existe.ps1'),
                     '-PrinterName', config.printer.name
                 ],
-                // En algunas PCs de caja, powershell.exe falla al iniciar desde Node con windowsHide=true.
-                { timeout: 15000, windowsHide: false }
+                // Ocultamos la ventana de PowerShell para no afectar la UX
+                { timeout: 15000, windowsHide: true }
             );
             // El script responde "OK" o "OK:<nombre real>" si la encuentra (match tolerante)
             return stdout.toString().trim().startsWith('OK');
@@ -74,22 +74,25 @@ class PrinterService {
     }
 
     public async print(texto: string): Promise<PrintResult> {
-        console.log(`🔍 Buscando impresora: ${config.printer.name}...`);
-
-        const available = await this.isPrinterAvailableAsync();
-        if (!available) {
-            const error = `Impresora "${config.printer.name}" no encontrada en el sistema`;
-            console.error(`❌ ${error}`);
-            return { success: false, error };
-        }
-
-        console.log('✅ Impresora encontrada');
-        console.log('📤 Enviando a imprimir...');
+        console.log(`� Preparando envío a impresora: ${config.printer.name}...`);
 
         const native = loadNativePrinter();
+        
+        // Optimización: Si usamos PowerShell (fallback), nos saltamos este chequeo previo 
+        // para no arrancar el proceso de MS DOS dos veces, ahorrando ~1-2s de latencia.
         if (native) {
+            if (!this.isPrinterAvailable()) {
+                const error = `Impresora "${config.printer.name}" no encontrada en el sistema`;
+                console.error(`❌ ${error}`);
+                return { success: false, error };
+            }
+            console.log('✅ Impresora encontrada (nativo)');
+            console.log('📤 Enviando a imprimir vía nativo...');
             return this.printNative(native, texto);
         }
+
+        console.log('📤 Enviando a imprimir vía PowerShell RAW...');
+        // printPowerShell devolverá su propio error en el mismo spool 
         return this.printPowerShell(texto);
     }
 
@@ -127,7 +130,8 @@ class PrinterService {
                     '-PrinterName', config.printer.name,
                     '-FilePath', tmpFile
                 ],
-                { timeout: 60000, windowsHide: false }
+                // Ocultamos la ventana de PowerShell para no afectar la UX
+                { timeout: 60000, windowsHide: true }
             );
             return { success: true, printerJobId: 'powershell-raw' };
         } catch (err) {

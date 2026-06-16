@@ -141,6 +141,40 @@ pm2 logs agente-caja-001
 curl http://localhost:4000/status
 ```
 
+### Paso 8: Arranque automático al iniciar sesión en Windows
+
+Si el servicio quedó configurado correctamente, al cerrar sesión y volver a entrar en Windows PM2 debe restaurar el proceso automáticamente.
+
+Verificaciones útiles:
+
+```powershell
+# Confirmar que PM2 tiene el proceso guardado para resurrect
+pm2 save --force
+
+# Ver el estado actual de PM2
+pm2 list
+
+# Confirmar que el puerto local está en uso por el servicio
+netstat -ano | findstr :4000
+
+# Confirmar la entrada de inicio automático de Windows para el usuario actual
+reg.exe query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v PM2
+```
+
+Si necesitas levantarlo manualmente antes del próximo inicio de sesión:
+
+```powershell
+# Desde la carpeta del proyecto
+npm run build
+pm2 start dist/index.js --name ticketera-service --update-env
+pm2 save --force
+```
+
+En esta implementación, el inicio automático depende de dos piezas:
+
+1. La entrada `PM2` en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+2. El archivo `C:\Users\USER\.pm2\dump.pm2`, que PM2 usa para restaurar procesos al entrar a sesión.
+
 ---
 
 ## 🔧 Configuración Avanzada
